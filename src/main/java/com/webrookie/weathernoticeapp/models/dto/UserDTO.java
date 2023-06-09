@@ -1,16 +1,16 @@
-package com.webrookie.weathernoticeapp.models.entity;
+package com.webrookie.weathernoticeapp.models.dto;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
 import java.util.Date;
 
 /**
  * @author WebRookie
- * @date 2023/3/30 18:35
+ * @date 2023/6/9 19:53
  **/
 @Data
-public class User {
+public class UserDTO {
     private Integer userId;
     private String openId;
     private String nickname;
@@ -19,6 +19,8 @@ public class User {
     private String longitude;
     private String adcode;
     private String city;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date createDate;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date updateDate;
 }

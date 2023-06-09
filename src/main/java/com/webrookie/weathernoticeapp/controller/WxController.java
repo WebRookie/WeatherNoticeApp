@@ -1,23 +1,35 @@
 package com.webrookie.weathernoticeapp.controller;
 
+import cn.hutool.json.JSONObject;
 import com.thoughtworks.xstream.XStream;
 import com.webrookie.weathernoticeapp.message.TextMessage;
+import com.webrookie.weathernoticeapp.models.dto.UserDTO;
+import com.webrookie.weathernoticeapp.models.entity.User;
+import com.webrookie.weathernoticeapp.models.utils.*;
+import com.webrookie.weathernoticeapp.service.UserService;
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
 import org.dom4j.Element;
 import org.dom4j.io.SAXReader;
+import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import javax.annotation.Resource;
 import javax.servlet.ServletInputStream;
 import javax.servlet.http.HttpServletRequest;
+import java.awt.*;
 import java.io.IOException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.util.*;
+import java.util.List;
 
 /**
  * @author WebRookie
@@ -25,8 +37,13 @@ import java.util.*;
  **/
 @RequestMapping("/")
 @RestController
+@EnableAsync  // 异步的注解
 public class WxController {
+
+    @Resource
+    private UserService userService;
     private static String TOKEN = "rookie";
+    private static final SecureRandom random = new SecureRandom();
     @GetMapping("/hello")
     public String hello() {
         System.out.println("in Come");
@@ -99,12 +116,64 @@ public class WxController {
         } catch (DocumentException e) {
            e.printStackTrace();
         }
-        System.out.println(map);
-        // 回复消息
+//        System.out.println(map);
+        String message = "";
+        try{
+            System.out.println(map);
+            String event = map.get("Event");
+            System.out.println(event);
+            if("subscribe".equals(event)) {
+                System.out.println("subscribe");
+                // 处理身份信息
+                handleUserHasSubscribe(map.get("FromUserName"));
+                message = getReplyMessage(map);
+            }
+            if("LOCATION".equals(event)) {
+                System.out.println("LOCATION");
+                handleGetLocation(map);
+                sendModelMessage();
+            }
+            // 回复消息
+        }catch (Exception e) {
+            System.out.println("发送失败");
+            e.printStackTrace();
+        }
 
-        String message = getReplyMessage(map);
-        System.out.println(message);
         return message;
+    }
+
+    /**
+     * 处理订阅功能
+     * @param fromUserName
+     */
+    private void handleUserHasSubscribe(String fromUserName) {
+        UserDTO user = userService.getUser(fromUserName);
+        if (user == null ) {
+            // 用户不存在则记录下来
+            System.out.println("no User");
+            userService.createUser(fromUserName);
+        }
+    }
+
+    /**
+     * 更新用户在获取地址信息时
+     * @param map
+     */
+    private void handleGetLocation(Map<String, String > map) {
+        if(!"LOCATION".equals(map.get("Event"))) {
+            return;
+        }
+        String latitude = map.get("Latitude");
+        String longitude = map.get("Longitude");
+        String openId = map.get("FromUserName");
+        JSONObject cityInfo = Weather.getCityCode(longitude,latitude);
+        UserDTO user = userService.getUser(openId);
+        user.setLatitude(latitude);
+        user.setLongitude(longitude);
+        System.out.println(cityInfo);
+        user.setAdcode(cityInfo.getStr("adcode"));
+        user.setCity(cityInfo.getStr("city"));
+        userService.updateUser(user);
     }
 
     /**
@@ -117,7 +186,7 @@ public class WxController {
         textMessage.setToUserName(map.get("FromUserName"));
         textMessage.setFromUserName(map.get("ToUserName"));
         textMessage.setMsgType("text");
-        textMessage.setContent("欢迎关注公众号");
+        textMessage.setContent("欢迎关注公众号,请允许获取您的地理位置");
         textMessage.setCreateTime(System.currentTimeMillis() / 1000);
 
         // XStream 将Java对象转换成xml字符串
@@ -126,4 +195,154 @@ public class WxController {
         String xml = xStream.toXML(textMessage);
         return xml;
     }
-}
+
+
+
+    /**
+     * 推送模板信息消息
+     * @return
+     */
+    @Scheduled(cron = "0 0 10 * * ?")
+    public void sendModelMessage() {
+        String url = String.format("https://api.weixin.qq.com/cgi-bin/message/template/send?access_token=%s", WxUtils.getAccessToken());
+//        String requestParam = "{\n" +
+//                "      \"touser\":\"oC4Nv50TEM4Kcc9V5LM-Co2rENHU\",\n" +
+//                "      \"template_id\": + weatherTemplateId +,\n" +
+//                "      \"data\":{\n" +
+//                "        \"userName\":{\n" +
+//                "         \"value\":\"宝贝儿～\"\n" +
+//                "         \"color\":\"宝贝儿～\"\n" +
+//                "         },\n" +
+//                "       \"date\": {\n" +
+//                "         \"value\":\"西安\"\n" +
+//                "         },\n" +
+//                "       \"weather\": {\n" +
+//                "         \"value\":\"34.56\"\n" +
+//                "         },\n" +
+//                "       \"minTemperature\": {\n" +
+//                "         \"value\":\"34.56\"\n" +
+//                "         },\n" +
+//                "       \"maxTemperature\": {\n" +
+//                "         \"value\":\"34.56\"\n" +
+//                "         },\n" +
+//                "       \"wind\": {\n" +
+//                "         \"value\":\"12\"\n" +
+//                "         },\n" +
+//                "       \"wet\": {\n" +
+//                "         \"value\":\"24.56\"\n" +
+//                "         },\n" +
+//                "       \"birthDay\": {\n" +
+//                "         \"value\":\"2\"\n" +
+//                "         },\n" +
+//                "       \"note\": {\n" +
+//                "         \"value\":\"好好学习，天天向上\"\n" +
+//                "         }\n" +
+//                "     }\n" +
+//                "}";
+//        String requestResult = HttpMethod.httpJsonPost(url, requestParam);
+//        System.out.println(requestResult);
+        String openId = "oC4Nv57FolhCgVVLcgDoEhH3hZXo";
+        String templateId = "j4cOFv5YXTQmjtslrlMvwLQkUK5FKEqp99VK4Mi1rRE";
+        Map<String, Object> stringObjectMap = handleCreateModelMessage(openId);
+        JSONObject  json = new JSONObject();
+        json.accumulate("touser",openId);
+        json.accumulate("template_id",templateId);
+        json.set("data", stringObjectMap);
+        System.out.println(json);
+        String requestResult = HttpMethod.httpJsonPost(url, json.toString());
+        System.out.println(requestResult);
+    }
+
+    /**
+     * 根据订阅用户发送信息弹窗提示
+     * @param openId
+     * @return
+     */
+    public Map<String, Object> handleCreateModelMessage(String openId) {
+        Map<String, Object> maps = new HashMap<String, Object>();
+//        获取用户信息
+        UserDTO user = userService.getUser(openId);
+        //获取用户地址
+        if(user == null || user.getAdcode() == null) {
+            return null;
+        }
+        JSONObject todayWeather = Weather.getTodayWeather(user.getAdcode());
+        System.out.println("以下是天气");
+        System.out.println(todayWeather);
+        String rainBowFart = RainBowFart.getRainBowFart();
+        Map<String,Object> first = new HashMap<>();
+        String defaultColor = "#000000";
+        first.put("value", "宝贝");
+        first.put("color", getColor(defaultColor));
+        maps.put("userName", first);
+
+        Map<String,Object> date = new HashMap<>();
+        first.put("value", todayWeather.getStr("date"));
+        first.put("color", getColor(defaultColor));
+        maps.put("date", date);
+
+        Map<String,Object> second = new HashMap<>();
+        second.put("value",todayWeather.getStr("week"));
+        second.put("color", getColor(defaultColor));
+        maps.put("week", second);
+
+        Map<String,Object> forth = new HashMap<>();
+//        System.out.println(DateUtils.getNextChineseBirthDay(9,21));
+        forth.put("value", DateUtils.getNextChineseBirthDay(9,21));
+        forth.put("color", getColor(defaultColor));
+        maps.put("yourBirthDay", forth);
+
+        Map<String,Object> third = new HashMap<>();
+        third.put("value", DateUtils.getNextChineseBirthDay(5,20));
+        third.put("color", getColor(defaultColor));
+        maps.put("myBirthDay", third);
+
+
+
+        Map<String,Object> fifth = new HashMap<>();
+        fifth.put("value", user.getCity());
+        fifth.put("color", getColor(defaultColor));
+        maps.put("city", fifth);
+
+        Map<String,Object> weatherDay = new HashMap<>();
+        weatherDay.put("value", todayWeather.getStr("dayweather"));
+        weatherDay.put("color", getColor(defaultColor));
+        maps.put("weatherDay", weatherDay);
+
+        Map<String,Object> sixer = new HashMap<>();
+        sixer.put("value", todayWeather.getStr("nightweather"));
+        sixer.put("color", getColor(defaultColor));
+        maps.put("weatherNight", sixer);
+
+        Map<String,Object> temperatureDay = new HashMap<>();
+        temperatureDay.put("value", todayWeather.getStr("daytemp"));
+        temperatureDay.put("color", getColor(defaultColor));
+        maps.put("temperatureDay", temperatureDay);
+
+        Map<String,Object> temperatureNight = new HashMap<>();
+        temperatureNight.put("value", todayWeather.getStr("nighttemp"));
+        temperatureNight.put("color", getColor(defaultColor));
+        maps.put("temperatureNight", temperatureNight);
+
+        Map<String,Object> randomInfo = new HashMap<>();
+        randomInfo.put("value", rainBowFart);
+        randomInfo.put("color", getColor(defaultColor));
+        maps.put("randomInfo", randomInfo);
+
+        return maps;
+
+    }
+
+    /**
+     * 随机颜色
+     * @param color
+     * @return
+     */
+    private static String getColor(String color) {
+        if (ConfigConstant.randomMessageColorMode) {
+            int i = random.nextInt(ConfigConstant.randomColors.length);
+            return ConfigConstant.randomColors[i];
+        } else {
+            return color;
+        }
+    }}

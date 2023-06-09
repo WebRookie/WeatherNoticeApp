@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.webrookie.weathernoticeapp.dao.UserMapper">
+    <insert id="insertUser">
+        insert into users(open_id) values(#{openId})
+    </insert>
+    <update id="updateUser">
+        update users set nickname = #{nickname}, avatar = #{avatar}, longitude = #{longitude}, latitude = #{latitude}, adcode = #{adcode}, city = #{city}
+        where open_id = #{openId}
+    </update>
+    <select id="getUserByOpenId" resultType="com.webrookie.weathernoticeapp.models.dto.UserDTO">
+        select * from users where open_id = #{openId}
+    </select>
+</mapper>
