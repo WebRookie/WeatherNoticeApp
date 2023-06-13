@@ -99,7 +99,7 @@ class WeatherTest {
                 "         }\n" +
                 "     }\n" +
                 "}";
-        String requestResult = HttpMethod.httpJsonPost(url, requestParam);
-        System.out.println(requestResult);
+//        String requestResult = HttpMethod.httpJsonPost(url, requestParam);
+//        System.out.println(requestResult);
     }
 }

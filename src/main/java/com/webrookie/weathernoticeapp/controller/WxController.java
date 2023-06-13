@@ -116,7 +116,6 @@ public class WxController {
         } catch (DocumentException e) {
            e.printStackTrace();
         }
-//        System.out.println(map);
         String message = "";
         try{
             System.out.println(map);
@@ -131,7 +130,7 @@ public class WxController {
             if("LOCATION".equals(event)) {
                 System.out.println("LOCATION");
                 handleGetLocation(map);
-                sendModelMessage();
+//                sendModelMessage(map.get("FromUserName"));
             }
             // 回复消息
         }catch (Exception e) {
@@ -202,49 +201,13 @@ public class WxController {
      * 推送模板信息消息
      * @return
      */
-    @Scheduled(cron = "0 0 10 * * ?")
-    public void sendModelMessage() {
+
+    public void sendModelMessage(String openId) {
         String url = String.format("https://api.weixin.qq.com/cgi-bin/message/template/send?access_token=%s", WxUtils.getAccessToken());
-//        String requestParam = "{\n" +
-//                "      \"touser\":\"oC4Nv50TEM4Kcc9V5LM-Co2rENHU\",\n" +
-//                "      \"template_id\": + weatherTemplateId +,\n" +
-//                "      \"data\":{\n" +
-//                "        \"userName\":{\n" +
-//                "         \"value\":\"宝贝儿～\"\n" +
-//                "         \"color\":\"宝贝儿～\"\n" +
-//                "         },\n" +
-//                "       \"date\": {\n" +
-//                "         \"value\":\"西安\"\n" +
-//                "         },\n" +
-//                "       \"weather\": {\n" +
-//                "         \"value\":\"34.56\"\n" +
-//                "         },\n" +
-//                "       \"minTemperature\": {\n" +
-//                "         \"value\":\"34.56\"\n" +
-//                "         },\n" +
-//                "       \"maxTemperature\": {\n" +
-//                "         \"value\":\"34.56\"\n" +
-//                "         },\n" +
-//                "       \"wind\": {\n" +
-//                "         \"value\":\"12\"\n" +
-//                "         },\n" +
-//                "       \"wet\": {\n" +
-//                "         \"value\":\"24.56\"\n" +
-//                "         },\n" +
-//                "       \"birthDay\": {\n" +
-//                "         \"value\":\"2\"\n" +
-//                "         },\n" +
-//                "       \"note\": {\n" +
-//                "         \"value\":\"好好学习，天天向上\"\n" +
-//                "         }\n" +
-//                "     }\n" +
-//                "}";
-//        String requestResult = HttpMethod.httpJsonPost(url, requestParam);
-//        System.out.println(requestResult);
-        String openId = "oC4Nv57FolhCgVVLcgDoEhH3hZXo";
+//        String openId = "oC4Nv57FolhCgVVLcgDoEhH3hZXo";
         String templateId = "j4cOFv5YXTQmjtslrlMvwLQkUK5FKEqp99VK4Mi1rRE";
         Map<String, Object> stringObjectMap = handleCreateModelMessage(openId);
-        JSONObject  json = new JSONObject();
+        JSONObject json = new JSONObject();
         json.accumulate("touser",openId);
         json.accumulate("template_id",templateId);
         json.set("data", stringObjectMap);
@@ -254,18 +217,36 @@ public class WxController {
     }
 
     /**
+     * 发送模板信息
+     */
+    @Scheduled(cron = "0 0 10 * * ?")
+//    @Scheduled(cron = "0 2 * * * ?")
+    public void scheduledSendModelMessage() {
+        String[] openIdList = {"oC4Nv50TEM4Kcc9V5LM-Co2rENHU", "oC4Nv57FolhCgVVLcgDoEhH3hZXo"};
+//        String[] openIdList = {"oC4Nv50TEM4Kcc9V5LM-Co2rENHU"};
+        for(String openId: openIdList) {
+            try {
+                sendModelMessage(openId);
+            }catch (Exception e) {
+                e.printStackTrace();;
+            }
+        }
+    }
+
+    /**
      * 根据订阅用户发送信息弹窗提示
      * @param openId
      * @return
      */
     public Map<String, Object> handleCreateModelMessage(String openId) {
         Map<String, Object> maps = new HashMap<String, Object>();
-//        获取用户信息
+        // 获取用户信息
         UserDTO user = userService.getUser(openId);
-        //获取用户地址
+        // 获取用户地址
         if(user == null || user.getAdcode() == null) {
             return null;
         }
+        // 公众号模板消息功能，微信取消了颜色的功能
         JSONObject todayWeather = Weather.getTodayWeather(user.getAdcode());
         System.out.println("以下是天气");
         System.out.println(todayWeather);
@@ -287,7 +268,6 @@ public class WxController {
         maps.put("week", second);
 
         Map<String,Object> forth = new HashMap<>();
-//        System.out.println(DateUtils.getNextChineseBirthDay(9,21));
         forth.put("value", DateUtils.getNextChineseBirthDay(9,21));
         forth.put("color", getColor(defaultColor));
         maps.put("yourBirthDay", forth);
